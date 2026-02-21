@@ -16,8 +16,8 @@ import { handleError } from './utils/errors.js'
 // cac requires multi-word commands as a single argv element
 const SUBCOMMANDS: Record<string, Set<string>> = {
   dao: new Set(['info']),
-  proposal: new Set(['list', 'get', 'votes']),
-  auction: new Set(['current', 'history', 'bid']),
+  proposal: new Set(['list', 'get', 'votes', 'queue', 'execute']),
+  auction: new Set(['current', 'history', 'bid', 'settle']),
   member: new Set(['list', 'info']),
   treasury: new Set(['balance']),
   token: new Set(['info']),
