@@ -1,13 +1,15 @@
+import { keccak256, stringToHex } from 'viem'
 import { getCli } from '../cli.js'
 import { getDAOConfig, resolveAddressOrEns } from '../core/resolver.js'
 import { getPublicClient, getWalletClient } from '../core/client.js'
+import { querySubgraph } from '../core/subgraph.js'
 import { governorAbi } from '../core/abis/governor.js'
 import { auctionAbi } from '../core/abis/auction.js'
 import { tokenAbi } from '../core/abis/token.js'
 import { printKeyValue } from '../output/table.js'
 import { printJson } from '../output/json.js'
 import { isJsonMode } from '../output/formatter.js'
-import { formatEth, truncateAddress } from '../utils/format.js'
+import { formatEth, truncateAddress, formatTimeRemaining } from '../utils/format.js'
 import { handleError, WalletNotConfiguredError } from '../utils/errors.js'
 import { getExplorerTxUrl } from '../integrations/etherscan.js'
 import { readFileSync } from 'fs'
@@ -254,6 +256,214 @@ cli.command('auction bid <amount>', 'Place a bid on the current auction')
         ['Amount', formatEth(amountWei)],
         ['Bidder', truncateAddress(account.address)],
         ['Tx    ', txUrl],
+      ])
+      console.log()
+    } catch (error) {
+      handleError(error)
+    }
+  })
+
+// ─── auction settle ────────────────────────────────────────────────────────
+
+cli.command('auction settle', 'Settle ended auction and start a new one')
+  .option('--token, -t <address>', 'Token address of the DAO')
+  .option('--chain, -c <name>', 'Chain: ethereum, base, optimism, zora', { default: 'base' })
+  .option('--json, -j', 'Output as JSON (for agents)')
+  .option('--private-key <key>', 'Private key (prefer .env)')
+  .action(async (options: WriteOptions) => {
+    try {
+      const daoConfig = await getDAOConfig(options)
+      const privateKey = getPrivateKey(options.privateKey)
+      const publicClient = getPublicClient(daoConfig.chain)
+
+      const auctionData = await publicClient.readContract({
+        abi: auctionAbi,
+        address: daoConfig.auction,
+        functionName: 'auction',
+      }) as [bigint, bigint, `0x${string}`, number, number, boolean]
+
+      const [tokenId, , , , endTime, settled] = auctionData
+
+      if (settled) throw new Error('Auction is already settled')
+      const now = Math.floor(Date.now() / 1000)
+      if (now < endTime) throw new Error(`Auction has not ended yet (${formatTimeRemaining(endTime)})`)
+
+      const walletClient = getWalletClient(daoConfig.chain, privateKey)
+      const account = walletClient.account!
+
+      const txHash = await walletClient.writeContract({
+        abi: auctionAbi,
+        address: daoConfig.auction,
+        functionName: 'settleCurrentAndCreateNewAuction',
+        args: [],
+        account,
+        chain: walletClient.chain,
+      })
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+      const txUrl = getExplorerTxUrl(txHash, daoConfig.chain)
+
+      if (isJsonMode(options)) {
+        printJson({ txHash, status: receipt.status, settledTokenId: tokenId.toString() })
+        return
+      }
+
+      console.log(`\nAuction settled — Token #${tokenId}`)
+      printKeyValue([
+        ['Status ', receipt.status === 'success' ? 'confirmed' : 'reverted'],
+        ['Settler', truncateAddress(account.address)],
+        ['Tx     ', txUrl],
+      ])
+      console.log()
+    } catch (error) {
+      handleError(error)
+    }
+  })
+
+// ─── proposal queue ────────────────────────────────────────────────────────
+
+async function resolveProposalIdBytes(
+  id: string,
+  daoConfig: { chain: string; token: string },
+): Promise<`0x${string}`> {
+  if (id.startsWith('0x')) return id as `0x${string}`
+  const pData = await querySubgraph<{ proposals: Array<{ proposalId: string }> }>(
+    daoConfig.chain,
+    `query($dao: String!, $number: Int!) {
+      proposals(where: { dao: $dao, proposalNumber: $number }, first: 1) { proposalId }
+    }`,
+    { dao: daoConfig.token.toLowerCase(), number: Number(id) },
+  )
+  if (!pData.proposals?.[0]) throw new Error(`Proposal #${id} not found`)
+  return pData.proposals[0].proposalId as `0x${string}`
+}
+
+cli.command('proposal queue <id>', 'Queue a succeeded proposal for execution')
+  .option('--token, -t <address>', 'Token address of the DAO')
+  .option('--chain, -c <name>', 'Chain: ethereum, base, optimism, zora', { default: 'base' })
+  .option('--json, -j', 'Output as JSON (for agents)')
+  .option('--private-key <key>', 'Private key (prefer .env)')
+  .action(async (id: string, options: WriteOptions) => {
+    try {
+      const daoConfig = await getDAOConfig(options)
+      const privateKey = getPrivateKey(options.privateKey)
+      const proposalIdBytes = await resolveProposalIdBytes(id, daoConfig)
+
+      const walletClient = getWalletClient(daoConfig.chain, privateKey)
+      const publicClient = getPublicClient(daoConfig.chain)
+      const account = walletClient.account!
+
+      const txHash = await walletClient.writeContract({
+        abi: governorAbi,
+        address: daoConfig.governor,
+        functionName: 'queue',
+        args: [proposalIdBytes],
+        account,
+        chain: walletClient.chain,
+      })
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+      const txUrl = getExplorerTxUrl(txHash, daoConfig.chain)
+
+      // Read eta after tx is confirmed
+      const eta = await publicClient.readContract({
+        abi: governorAbi,
+        address: daoConfig.governor,
+        functionName: 'proposalEta',
+        args: [proposalIdBytes],
+      })
+
+      if (isJsonMode(options)) {
+        printJson({ txHash, status: receipt.status, proposalId: proposalIdBytes, eta: eta.toString() })
+        return
+      }
+
+      console.log(`\nProposal #${id} queued`)
+      printKeyValue([
+        ['Status     ', receipt.status === 'success' ? 'confirmed' : 'reverted'],
+        ['Executable ', new Date(Number(eta) * 1000).toISOString()],
+        ['Tx         ', txUrl],
+      ])
+      console.log()
+    } catch (error) {
+      handleError(error)
+    }
+  })
+
+// ─── proposal execute ──────────────────────────────────────────────────────
+
+interface ProposalExecData {
+  proposalId: string
+  proposer: string
+  description: string
+  targets: string[]
+  values: string[]
+  calldatas: string[]
+}
+
+cli.command('proposal execute <id>', 'Execute a queued proposal')
+  .option('--token, -t <address>', 'Token address of the DAO')
+  .option('--chain, -c <name>', 'Chain: ethereum, base, optimism, zora', { default: 'base' })
+  .option('--json, -j', 'Output as JSON (for agents)')
+  .option('--private-key <key>', 'Private key (prefer .env)')
+  .action(async (id: string, options: WriteOptions) => {
+    try {
+      const daoConfig = await getDAOConfig(options)
+      const privateKey = getPrivateKey(options.privateKey)
+
+      // Fetch full proposal data needed for execute()
+      const query = id.startsWith('0x')
+        ? `query($id: String!) {
+            proposals(where: { proposalId: $id }, first: 1) {
+              proposalId proposer description targets values calldatas
+            }
+          }`
+        : `query($dao: String!, $number: Int!) {
+            proposals(where: { dao: $dao, proposalNumber: $number }, first: 1) {
+              proposalId proposer description targets values calldatas
+            }
+          }`
+
+      const vars = id.startsWith('0x')
+        ? { id }
+        : { dao: daoConfig.token.toLowerCase(), number: Number(id) }
+
+      const data = await querySubgraph<{ proposals: ProposalExecData[] }>(daoConfig.chain, query, vars)
+      const proposal = data.proposals?.[0]
+      if (!proposal) throw new Error(`Proposal #${id} not found`)
+
+      const targets = proposal.targets as `0x${string}`[]
+      const values = proposal.values.map(v => BigInt(v))
+      const calldatas = proposal.calldatas as `0x${string}`[]
+      const proposer = proposal.proposer as `0x${string}`
+      const descriptionHash = keccak256(stringToHex(proposal.description)) as `0x${string}`
+
+      const walletClient = getWalletClient(daoConfig.chain, privateKey)
+      const publicClient = getPublicClient(daoConfig.chain)
+      const account = walletClient.account!
+
+      const txHash = await walletClient.writeContract({
+        abi: governorAbi,
+        address: daoConfig.governor,
+        functionName: 'execute',
+        args: [targets, values, calldatas, descriptionHash, proposer],
+        account,
+        chain: walletClient.chain,
+      })
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+      const txUrl = getExplorerTxUrl(txHash, daoConfig.chain)
+
+      if (isJsonMode(options)) {
+        printJson({ txHash, status: receipt.status, proposalId: proposal.proposalId })
+        return
+      }
+
+      console.log(`\nProposal #${id} executed`)
+      printKeyValue([
+        ['Status  ', receipt.status === 'success' ? 'confirmed' : 'reverted'],
+        ['Executor', truncateAddress(account.address)],
+        ['Tx      ', txUrl],
       ])
       console.log()
     } catch (error) {
