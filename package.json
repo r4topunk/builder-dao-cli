@@ -1,6 +1,6 @@
 {
   "name": "builder-dao-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLI for agents and humans to interact with any Builder Protocol DAO",
   "main": "./dist/index.js",
   "files": [
