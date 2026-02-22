@@ -17,7 +17,7 @@ Auto-discovers contracts via Manager contract. Multi-chain: Ethereum, Base, Opti
 
 | Layer | What |
 |-------|------|
-| Read commands | `dao info`, `proposal list/get/votes`, `auction current/history`, `member list/info`, `treasury balance`, `token info` |
+| Read commands | `dao info`, `proposal list/get/votes`, `auction current/history`, `member list/info`, `treasury balance`, `token info`, `config wallet` |
 | Write commands | `vote`, `propose`, `auction bid/settle`, `delegate`, `proposal queue/execute` |
 | Output modes | Table (default, human), `--json` (agent-friendly) |
 | Global flags | `--token/-t`, `--chain/-c`, `--json/-j`, `--quiet/-q`, `--rpc` |
@@ -60,6 +60,7 @@ Want to READ data?
   About members              → bdao member list / bdao member info <address>
   About treasury             → bdao treasury balance
   About a token              → bdao token info <id>
+  About your wallet          → bdao config wallet
 
 Want to WRITE on-chain?
   Vote on proposal           → bdao vote <id> <for|against|abstain>

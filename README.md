@@ -41,8 +41,9 @@ GOLDSKY_PROJECT_ID=
 Generate a template:
 
 ```bash
-bdao config init   # creates .env.example
-bdao config show   # shows current config status
+bdao config init     # creates .env.example
+bdao config show     # shows current config status
+bdao config wallet   # shows wallet address, ETH balance, and DAO memberships
 ```
 
 ## Global flags
@@ -101,6 +102,13 @@ bdao treasury balance            # ETH balance of the treasury
 
 ```bash
 bdao token info <id>             # Owner + metadata URI for a token ID
+```
+
+### Wallet
+
+```bash
+bdao config wallet                  # Address, ETH balance, all DAO memberships
+bdao config wallet --chain ethereum # Balance on specific chain
 ```
 
 ### Write operations (require `PRIVATE_KEY`)

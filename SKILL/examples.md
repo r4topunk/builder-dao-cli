@@ -95,7 +95,20 @@ node dist/index.js dao info --token 0x... --chain optimism
 node dist/index.js dao info --token 0x... --chain zora
 ```
 
-### 8. Using .env for defaults
+### 8. Wallet inspection
+
+```bash
+# Check your wallet address, ETH balance, and all DAO memberships
+bdao config wallet
+
+# Check balance on a specific chain
+bdao config wallet --chain ethereum
+
+# JSON output for programmatic use
+bdao config wallet --json
+```
+
+### 9. Using .env for defaults
 
 ```bash
 # .env file eliminates repetitive flags

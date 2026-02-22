@@ -1,7 +1,8 @@
 import { formatEther } from 'viem'
 
 export function formatEth(value: bigint): string {
-  return formatEther(value).replace(/\.?0+$/, '').replace(/\.$/, '') + ' ETH'
+  const str = formatEther(value).replace(/\.?0+$/, '').replace(/\.$/, '')
+  return (str || '0') + ' ETH'
 }
 
 export function truncateAddress(address: string, chars = 6): string {

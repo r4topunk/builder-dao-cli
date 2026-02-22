@@ -21,7 +21,7 @@ const SUBCOMMANDS: Record<string, Set<string>> = {
   member: new Set(['list', 'info']),
   treasury: new Set(['balance']),
   token: new Set(['info']),
-  config: new Set(['init', 'show']),
+  config: new Set(['init', 'show', 'wallet']),
 }
 
 function preprocessArgv(argv: string[]): string[] {

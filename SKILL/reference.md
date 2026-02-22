@@ -104,6 +104,17 @@ bdao config show    # Show current configuration
 bdao config init    # Create .env.example
 ```
 
+### config wallet
+
+Show wallet address, ETH balance, and all DAO memberships across supported chains.
+Requires `PRIVATE_KEY` env var.
+
+```bash
+bdao config wallet                  # Balance on default chain + all DAO memberships
+bdao config wallet --chain ethereum # Balance on Ethereum
+bdao config wallet --json           # JSON output for agent parsing
+```
+
 ---
 
 ## Write commands
