@@ -156,7 +156,10 @@ cli.command('propose', 'Create a governance proposal')
       } else {
         if (!options.title) throw new Error('--title is required')
         if (!options.target) throw new Error('--target is required (use treasury address for ETH transfer)')
-        targets = [options.target as `0x${string}`]
+        // cac/mri auto-converts 0x... to Number losing precision; read raw from argv
+        const rawTargetIdx = process.argv.findIndex(a => a === '--target')
+        const rawTarget = rawTargetIdx >= 0 ? process.argv[rawTargetIdx + 1]! : String(options.target)
+        targets = [rawTarget as `0x${string}`]
         values = [BigInt(options.value ?? '0')]
         calldatas = [(options.calldata ?? '0x') as `0x${string}`]
         description = options.description
@@ -434,7 +437,8 @@ cli.command('proposal execute <id>', 'Execute a queued proposal')
 
       const targets = proposal.targets as `0x${string}`[]
       const values = proposal.values.map(v => BigInt(v))
-      const calldatas = proposal.calldatas as `0x${string}`[]
+      const rawCalldatas = proposal.calldatas
+      const calldatas = (Array.isArray(rawCalldatas) ? rawCalldatas : [rawCalldatas]) as `0x${string}`[]
       const proposer = proposal.proposer as `0x${string}`
       const descriptionHash = keccak256(stringToHex(proposal.description)) as `0x${string}`
 
