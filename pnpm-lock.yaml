@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@zoralabs/coins-sdk':
+        specifier: ^0.4.3
+        version: 0.4.3(abitype@1.2.3(typescript@5.9.3)(zod@3.25.76))(viem@2.46.2(typescript@5.9.3)(zod@3.25.76))
       cac:
         specifier: ^6.7.0
         version: 6.7.14
@@ -347,6 +350,10 @@ packages:
     peerDependencies:
       graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
 
+  '@hey-api/client-fetch@0.8.4':
+    resolution: {integrity: sha512-SWtUjVEFIUdiJGR2NiuF0njsSrSdTe7WHWkp3BLH3DEl2bRhiflOnBo29NSDdrY90hjtTQiTQkBxUgGOF29Xzg==}
+    deprecated: Starting with v0.73.0, this package is bundled directly inside @hey-api/openapi-ts.
+
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
 
@@ -540,6 +547,16 @@ packages:
 
   '@vitest/utils@2.1.9':
     resolution: {integrity: sha512-v0psaMSkNJ3A2NMrUEHFRzJtDPFn+/VWZ5WxImB21T9fjucJRmS7xCS3ppEnARb9y11OAzaD+P2Ps+b+BGX5iQ==}
+
+  '@zoralabs/coins-sdk@0.4.3':
+    resolution: {integrity: sha512-88tU59ITSMmd3BIMCAhyjneDv+1sp2yN+vftW8Ev+v8GA6ChZdYjDf/2msyzzy2MPxrURl/q3NWW6dWQQFY8zQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      abitype: ^1.0.8
+      viem: 2.22.12
+
+  '@zoralabs/protocol-deployments@0.7.2':
+    resolution: {integrity: sha512-111yygoTKPFSd+iAnUNJDUC3mZBDW2xidpFZHN+q2ZT8H3SvN2jlmS1WJxPgvfE9tfdfDoTTT098dYuOuaU6pg==}
 
   abitype@1.2.3:
     resolution: {integrity: sha512-Ofer5QUnuUdTFsBRwARMoWKOH1ND5ehwYhJ3OJ/BQO+StkwQjHw0XyVh4vDttzHB7QOFhPHa/o413PJ82gU/Tg==}
@@ -1117,6 +1134,8 @@ snapshots:
     dependencies:
       graphql: 16.12.0
 
+  '@hey-api/client-fetch@0.8.4': {}
+
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -1272,6 +1291,15 @@ snapshots:
       '@vitest/pretty-format': 2.1.9
       loupe: 3.2.1
       tinyrainbow: 1.2.0
+
+  '@zoralabs/coins-sdk@0.4.3(abitype@1.2.3(typescript@5.9.3)(zod@3.25.76))(viem@2.46.2(typescript@5.9.3)(zod@3.25.76))':
+    dependencies:
+      '@hey-api/client-fetch': 0.8.4
+      '@zoralabs/protocol-deployments': 0.7.2
+      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.76)
+      viem: 2.46.2(typescript@5.9.3)(zod@3.25.76)
+
+  '@zoralabs/protocol-deployments@0.7.2': {}
 
   abitype@1.2.3(typescript@5.9.3)(zod@3.25.76):
     optionalDependencies:
