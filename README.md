@@ -4,20 +4,20 @@
 
 Auto-discovers all DAO contracts from a single token address via the Manager contract. Works on Ethereum, Base, Optimism, and Zora.
 
-## Quick start
+## Install
 
 ```bash
-pnpm install
-pnpm build
-
-node dist/index.js dao info --token 0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17 --chain base
+npm install -g builder-dao-cli
 ```
 
-Or install globally:
+```bash
+bdao dao info --token 0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17 --chain base
+```
+
+Or run without installing:
 
 ```bash
-npm install -g .
-builder dao info --token 0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17 --chain base
+npx builder-dao-cli dao info --token 0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17 --chain base
 ```
 
 ## Configuration
@@ -41,8 +41,8 @@ GOLDSKY_PROJECT_ID=
 Generate a template:
 
 ```bash
-builder config init   # creates .env.example
-builder config show   # shows current config status
+bdao config init   # creates .env.example
+bdao config show   # shows current config status
 ```
 
 ## Global flags
@@ -60,17 +60,17 @@ builder config show   # shows current config status
 ### DAO
 
 ```bash
-builder dao info                    # Discover all DAO contracts + supply + chain
-builder dao discover <token>        # Same, explicit token address
+bdao dao info                    # Discover all DAO contracts + supply + chain
+bdao dao discover <token>        # Same, explicit token address
 ```
 
 ### Proposals
 
 ```bash
-builder proposal list               # List all proposals
-builder proposal list --status ACTIVE --limit 10 --skip 0
-builder proposal get <id>           # By proposal number or 0x proposalId
-builder proposal votes <id>         # Votes for a proposal (paginated)
+bdao proposal list               # List all proposals
+bdao proposal list --status ACTIVE --limit 10 --skip 0
+bdao proposal get <id>           # By proposal number or 0x proposalId
+bdao proposal votes <id>         # Votes for a proposal (paginated)
 ```
 
 Status values: `PENDING` `ACTIVE` `SUCCEEDED` `QUEUED` `DEFEATED` `EXECUTED` `CANCELED` `VETOED`
@@ -78,46 +78,46 @@ Status values: `PENDING` `ACTIVE` `SUCCEEDED` `QUEUED` `DEFEATED` `EXECUTED` `CA
 ### Auction
 
 ```bash
-builder auction current             # Current active auction
-builder auction history             # Past settled auctions
+bdao auction current             # Current active auction
+bdao auction history             # Past settled auctions
 ```
 
 ### Members
 
 ```bash
-builder member list                 # All token holders (sorted by token count)
-builder member list --sort votes --limit 20
-builder member info <address>       # Balance, votes, delegation, token IDs
-builder member info vitalik.eth     # ENS names resolved automatically
+bdao member list                 # All token holders (sorted by token count)
+bdao member list --sort votes --limit 20
+bdao member info <address>       # Balance, votes, delegation, token IDs
+bdao member info vitalik.eth     # ENS names resolved automatically
 ```
 
 ### Treasury
 
 ```bash
-builder treasury balance            # ETH balance of the treasury
+bdao treasury balance            # ETH balance of the treasury
 ```
 
 ### Token
 
 ```bash
-builder token info <id>             # Owner + metadata URI for a token ID
+bdao token info <id>             # Owner + metadata URI for a token ID
 ```
 
 ### Write operations (require `PRIVATE_KEY`)
 
 ```bash
 # Governance
-builder vote <proposalId> for               # Cast vote (for/against/abstain or 0/1/2)
-builder vote <proposalId> against --reason "Because..."
-builder propose --title "Fund event" --target 0xRECIPIENT --value 1000000000000000000
-builder propose --from proposal.json        # Load from JSON file
-builder proposal queue <id>                 # Queue a succeeded proposal
-builder proposal execute <id>              # Execute a queued proposal
-builder delegate <address>                  # Delegate voting power (supports ENS)
+bdao vote <proposalId> for               # Cast vote (for/against/abstain or 0/1/2)
+bdao vote <proposalId> against --reason "Because..."
+bdao propose --title "Fund event" --target 0xRECIPIENT --value 1000000000000000000
+bdao propose --from proposal.json        # Load from JSON file
+bdao proposal queue <id>                 # Queue a succeeded proposal
+bdao proposal execute <id>              # Execute a queued proposal
+bdao delegate <address>                  # Delegate voting power (supports ENS)
 
 # Auction
-builder auction bid 0.5                     # Bid 0.5 ETH on current auction
-builder auction settle                      # Settle ended auction and start new one
+bdao auction bid 0.5                     # Bid 0.5 ETH on current auction
+bdao auction settle                      # Settle ended auction and start new one
 ```
 
 ## For AI agents
@@ -126,23 +126,23 @@ All commands support `--json` for machine-readable output. Errors are also retur
 
 ```bash
 # Discover DAO contracts
-builder dao info --token 0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17 --chain base --json
+bdao dao info --token 0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17 --chain base --json
 # → { "chain": "base", "token": "0x...", "auction": "0x...", "governor": "0x...", ... }
 
 # Get active proposals
-builder proposal list --status ACTIVE --json
+bdao proposal list --status ACTIVE --json
 # → [{ "proposalNumber": 42, "title": "...", "status": "ACTIVE", "forVotes": "...", ... }]
 
 # Current auction state
-builder auction current --json
+bdao auction current --json
 # → { "tokenId": "...", "highBidder": "0x...", "highBid": "500000000000000000", "endTime": "..." }
 
 # Member snapshot
-builder member list --json
+bdao member list --json
 # → [{ "address": "0x...", "ens": "vitalik.eth", "tokenCount": 5, "votes": "5" }, ...]
 
 # Cast vote
-builder vote 42 for --reason "Ships fast" --json
+bdao vote 42 for --reason "Ships fast" --json
 # → { "txHash": "0x...", "explorerUrl": "https://basescan.org/tx/0x..." }
 ```
 
