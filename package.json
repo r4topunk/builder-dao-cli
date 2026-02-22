@@ -30,7 +30,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@zoralabs/coins-sdk": "^0.4.3",
     "cac": "^6.7.0",
     "dotenv": "^16.4.0",
     "graphql": "^16.11.0",
