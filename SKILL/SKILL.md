@@ -41,6 +41,7 @@ GOLDSKY_PROJECT_ID=          # defaults to public project
 
 ```bash
 npm install -g builder-dao-cli
+# binary: bdao
 ```
 
 Or run without installing:
@@ -49,32 +50,25 @@ Or run without installing:
 npx builder-dao-cli <command> [options]
 ```
 
-## Development (from source)
-
-```bash
-pnpm install && pnpm build
-node dist/index.js <command> [options]
-```
-
 ## Decision tree: which command?
 
 ```
 Want to READ data?
-  About the DAO itself       → dao info
-  About proposals            → proposal list / proposal get <id> / proposal votes <id>
-  About auctions             → auction current / auction history
-  About members              → member list / member info <address>
-  About treasury             → treasury balance
-  About a token              → token info <id>
+  About the DAO itself       → bdao dao info
+  About proposals            → bdao proposal list / bdao proposal get <id> / bdao proposal votes <id>
+  About auctions             → bdao auction current / bdao auction history
+  About members              → bdao member list / bdao member info <address>
+  About treasury             → bdao treasury balance
+  About a token              → bdao token info <id>
 
 Want to WRITE on-chain?
-  Vote on proposal           → vote <id> <for|against|abstain>
-  Create proposal            → propose --title "..." --description "..." --target 0x... --value 0 --calldata 0x...
-  Bid on auction             → auction bid <amount_eth>
-  Settle ended auction       → auction settle
-  Delegate voting power      → delegate <address>
-  Queue succeeded proposal   → proposal queue <id>
-  Execute queued proposal    → proposal execute <id>
+  Vote on proposal           → bdao vote <id> <for|against|abstain>
+  Create proposal            → bdao propose --title "..." --description "..." --target 0x... --value 0 --calldata 0x...
+  Bid on auction             → bdao auction bid <amount_eth>
+  Settle ended auction       → bdao auction settle
+  Delegate voting power      → bdao delegate <address>
+  Queue succeeded proposal   → bdao proposal queue <id>
+  Execute queued proposal    → bdao proposal execute <id>
 ```
 
 ## Additional resources
