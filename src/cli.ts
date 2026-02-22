@@ -4,7 +4,7 @@ let _cli: CAC | null = null
 
 export function getCli(): CAC {
   if (!_cli) {
-    _cli = cac('builder')
+    _cli = cac('bdao')
     _cli
       .option('--token, -t <address>', 'Token address of the DAO')
       .option('--chain, -c <name>', 'Chain: ethereum, base, optimism, zora', { default: 'base' })

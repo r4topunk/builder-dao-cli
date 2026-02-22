@@ -3,9 +3,25 @@
   "version": "0.1.0",
   "description": "CLI for agents and humans to interact with any Builder Protocol DAO",
   "main": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
   "bin": {
-    "builder": "./dist/index.js"
+    "bdao": "./dist/index.js"
   },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "dao",
+    "nouns",
+    "builder",
+    "web3",
+    "cli",
+    "ethereum",
+    "base"
+  ],
+  "license": "MIT",
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/index.ts",
