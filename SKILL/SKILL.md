@@ -37,7 +37,19 @@ BASE_RPC_URL=               # defaults to public RPC
 GOLDSKY_PROJECT_ID=          # defaults to public project
 ```
 
-## Build & run
+## Install
+
+```bash
+npm install -g builder-dao-cli
+```
+
+Or run without installing:
+
+```bash
+npx builder-dao-cli <command> [options]
+```
+
+## Development (from source)
 
 ```bash
 pnpm install && pnpm build

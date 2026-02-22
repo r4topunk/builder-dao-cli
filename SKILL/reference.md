@@ -21,7 +21,7 @@ All commands accept these flags:
 Show DAO overview: name, symbol, supply, owner count, contract addresses.
 
 ```bash
-node dist/index.js dao info --token 0x... --chain base
+bdao dao info --token 0x... --chain base
 ```
 
 ### proposal list
@@ -29,7 +29,7 @@ node dist/index.js dao info --token 0x... --chain base
 List proposals with status, vote counts, quorum.
 
 ```bash
-node dist/index.js proposal list [--limit 20] [--skip 0] [--status ACTIVE|PENDING|SUCCEEDED|DEFEATED|QUEUED|EXECUTED|VETOED|CANCELED]
+bdao proposal list [--limit 20] [--skip 0] [--status ACTIVE|PENDING|SUCCEEDED|DEFEATED|QUEUED|EXECUTED|VETOED|CANCELED]
 ```
 
 ### proposal get
@@ -37,7 +37,7 @@ node dist/index.js proposal list [--limit 20] [--skip 0] [--status ACTIVE|PENDIN
 Full details of a single proposal.
 
 ```bash
-node dist/index.js proposal get <id>
+bdao proposal get <id>
 # id: proposal number (42) or proposalId bytes32 (0x...)
 ```
 
@@ -46,7 +46,7 @@ node dist/index.js proposal get <id>
 All votes on a proposal with voter, weight, support, reason.
 
 ```bash
-node dist/index.js proposal votes <id> [--limit 100] [--skip 0]
+bdao proposal votes <id> [--limit 100] [--skip 0]
 ```
 
 ### auction current
@@ -54,7 +54,7 @@ node dist/index.js proposal votes <id> [--limit 100] [--skip 0]
 Active auction: token ID, highest bidder, bid amount, time remaining.
 
 ```bash
-node dist/index.js auction current
+bdao auction current
 ```
 
 ### auction history
@@ -62,7 +62,7 @@ node dist/index.js auction current
 Past auctions with winners and prices.
 
 ```bash
-node dist/index.js auction history [--limit 20]
+bdao auction history [--limit 20]
 ```
 
 ### member list
@@ -70,7 +70,7 @@ node dist/index.js auction history [--limit 20]
 DAO members with token count and delegation info.
 
 ```bash
-node dist/index.js member list [--limit 20] [--skip 0] [--sort tokens|votes]
+bdao member list [--limit 20] [--skip 0] [--sort tokens|votes]
 ```
 
 ### member info
@@ -78,7 +78,7 @@ node dist/index.js member list [--limit 20] [--skip 0] [--sort tokens|votes]
 Specific member: tokens, votes, delegation, token IDs.
 
 ```bash
-node dist/index.js member info <address|ens.eth>
+bdao member info <address|ens.eth>
 ```
 
 ### treasury balance
@@ -86,7 +86,7 @@ node dist/index.js member info <address|ens.eth>
 ETH balance of the DAO treasury.
 
 ```bash
-node dist/index.js treasury balance
+bdao treasury balance
 ```
 
 ### token info
@@ -94,14 +94,14 @@ node dist/index.js treasury balance
 Owner and URI of a specific token.
 
 ```bash
-node dist/index.js token info <tokenId>
+bdao token info <tokenId>
 ```
 
 ### config show / config init
 
 ```bash
-node dist/index.js config show    # Show current configuration
-node dist/index.js config init    # Create .env.example
+bdao config show    # Show current configuration
+bdao config init    # Create .env.example
 ```
 
 ---
@@ -115,7 +115,7 @@ All write commands require `PRIVATE_KEY` env var or `--private-key` flag.
 Cast a vote on a governance proposal.
 
 ```bash
-node dist/index.js vote <proposalId> <for|against|abstain|0|1|2> [--reason "text"] [--private-key 0x...]
+bdao vote <proposalId> <for|against|abstain|0|1|2> [--reason "text"] [--private-key 0x...]
 ```
 
 - `proposalId`: numeric proposal number or bytes32 hash
@@ -128,10 +128,10 @@ Create a governance proposal.
 
 ```bash
 # Single action inline
-node dist/index.js propose --title "..." --description "..." --target 0x... --value 0 --calldata 0x...
+bdao propose --title "..." --description "..." --target 0x... --value 0 --calldata 0x...
 
 # Multiple actions from JSON
-node dist/index.js propose --from proposal.json
+bdao propose --from proposal.json
 ```
 
 JSON format for `--from`:
@@ -150,8 +150,8 @@ JSON format for `--from`:
 Bid on the current auction.
 
 ```bash
-node dist/index.js auction bid <amount_in_eth>
-# Example: node dist/index.js auction bid 0.5
+bdao auction bid <amount_in_eth>
+# Example: bdao auction bid 0.5
 ```
 
 Validates: auction is active, amount > current highest bid.
@@ -161,7 +161,7 @@ Validates: auction is active, amount > current highest bid.
 Settle an ended auction and start a new one.
 
 ```bash
-node dist/index.js auction settle
+bdao auction settle
 ```
 
 Validates: auction has ended.
@@ -171,7 +171,7 @@ Validates: auction has ended.
 Delegate voting power to an address.
 
 ```bash
-node dist/index.js delegate <address|ens.eth>
+bdao delegate <address|ens.eth>
 ```
 
 ### proposal queue
@@ -179,7 +179,7 @@ node dist/index.js delegate <address|ens.eth>
 Queue a succeeded proposal for execution (starts timelock).
 
 ```bash
-node dist/index.js proposal queue <id>
+bdao proposal queue <id>
 ```
 
 ### proposal execute
@@ -187,7 +187,7 @@ node dist/index.js proposal queue <id>
 Execute a queued proposal after timelock expires.
 
 ```bash
-node dist/index.js proposal execute <id>
+bdao proposal execute <id>
 ```
 
 ---
