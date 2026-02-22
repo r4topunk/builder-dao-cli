@@ -1,14 +1,14 @@
-# PRD: builder-cli — CLI para Agentes Interagirem com Builder DAOs
+# PRD: builder-dao-cli — CLI para Agentes Interagirem com Builder DAOs
 
-> **Status:** Draft v1.0
-> **Data:** 2026-02-21
+> **Status:** v1.1 — MVP + Write operations implementados
+> **Data:** 2026-02-22
 > **Autor:** r4to
 
 ---
 
 ## TL;DR
 
-CLI open-source em TypeScript para agentes (e humanos) interagirem com qualquer DAO construída no Builder Protocol (Nouns Builder). Suporta auto-discovery de contratos via Manager, multi-chain (Ethereum, Base, Optimism, Zora), e integra ENS, Etherscan e Farcaster para enriquecer a UX.
+CLI open-source em TypeScript para agentes (e humanos) interagirem com qualquer DAO construída no Builder Protocol (Nouns Builder). Suporta auto-discovery de contratos via Manager, multi-chain (Ethereum, Base, Optimism, Zora), e integra ENS, Etherscan e IPFS. Operações de leitura e escrita implementadas.
 
 ---
 
@@ -33,8 +33,8 @@ Uma CLI que:
 1. **Auto-descobre** todos os contratos de uma DAO a partir do endereço do Token, usando o Manager contract
 2. **Funciona com qualquer Builder DAO** — Gnars, Purple, Builder, etc.
 3. **Output dual:** human-readable por default, `--json` para agentes
-4. **Read + Write:** consultas (propostas, membros, auction) e ações (votar, propor, bid)
-5. **Integrações:** ENS (resolver nomes), Etherscan (verificar contratos), Farcaster (perfis de membros)
+4. **Read + Write:** consultas (propostas, membros, auction) e ações (votar, propor, bid, queue, execute, settle, delegate)
+5. **Integrações:** ENS (resolver nomes), Etherscan (links de tx), IPFS (resolver URIs de token)
 
 ---
 
@@ -55,25 +55,24 @@ Uma CLI que:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                        builder-cli                            │
+│                        builder-dao-cli                        │
 │                                                               │
 │  ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
 │  │ Commands │  │DAO       │  │ Output   │  │ Integrations │  │
 │  │          │  │Resolver  │  │Formatter │  │              │  │
-│  │ dao      │  │          │  │          │  │ ENS          │  │
-│  │ auction  │  │ Manager  │  │ table    │  │ Etherscan    │  │
-│  │ proposal │  │ contract │  │ json     │  │ Farcaster    │  │
-│  │ member   │  │ → Token  │  │ minimal  │  │ IPFS         │  │
+│  │ dao      │  │          │  │          │  │ ENS      ✅  │  │
+│  │ auction  │  │ Manager  │  │ table    │  │ Etherscan✅  │  │
+│  │ proposal │  │ contract │  │ json     │  │ IPFS     ✅  │  │
+│  │ member   │  │ → Token  │  │          │  │ Farcaster🔜  │  │
 │  │ treasury │  │ → Auction│  │          │  │              │  │
 │  │ token    │  │ → Gov    │  │          │  │              │  │
-│  │ vote     │  │ → Meta   │  │          │  │              │  │
-│  │ propose  │  │ → Treas  │  │          │  │              │  │
+│  │ write    │  │ → Meta   │  │          │  │              │  │
 │  └─────────┘  └──────────┘  └──────────┘  └──────────────┘  │
 │                                                               │
 │  ┌──────────────────────────────────────────────────────────┐ │
 │  │                    Core Layer                             │ │
 │  │  Viem (public + wallet client)  |  Subgraph Client       │ │
-│  │  Config (env + discovery)       |  ABI Registry           │ │
+│  │  Config (env + discovery)       |  ABI Registry          │ │
 │  └──────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -113,8 +112,10 @@ Input: Token address OR ENS name
 | Prioridade | Fonte | Uso |
 |------------|-------|-----|
 | 1 (maior) | `--token 0x... --chain base` | CLI flags |
-| 2 | `.env` / `.builder-cli.toml` | Defaults por projeto |
+| 2 | `.env` | Defaults por projeto |
 | 3 (menor) | Auto-discovery via Manager | Fallback universal |
+
+> **Decisão tomada:** `.builder-cli.toml` descartado — `.env` only. Suficiente para o uso atual.
 
 **`.env` example:**
 ```bash
@@ -133,9 +134,8 @@ PRIVATE_KEY=[PRIVATE_KEY]
 
 # Optional integrations
 ETHERSCAN_API_KEY=[API_KEY]
-BASESCAN_API_KEY=[API_KEY]
-NEYNAR_API_KEY=[API_KEY]
 GOLDSKY_PROJECT_ID=project_cm33ek8kjx6pz010i2c3w8z25
+# NEYNAR_API_KEY=[API_KEY]  ← futuro (Farcaster)
 ```
 
 ---
@@ -149,7 +149,7 @@ GOLDSKY_PROJECT_ID=project_cm33ek8kjx6pz010i2c3w8z25
 | Optimism | 10 | `0x3ac0E64Fe2931f8e082C6Bb29283540DE9b5371C` | nouns-builder-optimism-mainnet |
 | Zora | 7777777 | `0x3ac0E64Fe2931f8e082C6Bb29283540DE9b5371C` | nouns-builder-zora-mainnet |
 
-> **Nota:** L2 chains (Base, Optimism, Zora) compartilham o mesmo Manager address (`0x3ac0...71c`) via deterministic CREATE2 deployment. ProtocolRewards (`0x7777777F279eba3d3Ad8F4E708545291A6fDBA8B`) também é o mesmo em todas as chains.
+> L2 chains compartilham o mesmo Manager address via deterministic CREATE2. ProtocolRewards (`0x7777777F279eba3d3Ad8F4E708545291A6fDBA8B`) também é o mesmo em todas as chains.
 
 **Subgraph base URL:**
 ```
@@ -160,148 +160,120 @@ https://api.goldsky.com/api/public/{GOLDSKY_PROJECT_ID}/subgraphs/{subgraph-name
 
 ## 6. Comandos
 
-### 6.1 Core — Read Operations
+> **Legenda:** ✅ implementado | 🔜 planejado
 
-#### `builder dao info`
-Mostra informações gerais da DAO.
+### 6.1 Read Operations
+
+#### `builder dao info` ✅
+Mostra informações gerais da DAO: contratos, supply, chain.
 
 ```bash
 builder dao info --token 0x880f... --chain base
-builder dao info                    # usa defaults do .env
-
-# Output:
-# Gnars DAO (Base)
-# Token:    0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17
-# Auction:  0x494eaa55ecf6310658b8fc004b0888dcb698097f
-# Governor: 0x3dd4e53a232b7b715c9ae455f4e732465ed71b4c
-# Treasury: 0x72ad986ebac0246d2b3c565ab2a1ce3a14ce6f88
-# Metadata: 0xdc9799d424ebfdcf5310f3bad3ddcce3931d4b58
-# Supply:   1,234 tokens
-# Owners:   456
+builder dao info --json
 ```
 
-#### `builder auction current`
-Mostra o auction ativo.
+#### `builder dao discover <token>` ✅
+Alias explícito para auto-discovery. Mesma saída que `dao info`.
+
+```bash
+builder dao discover 0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17 --chain base
+```
+
+#### `builder auction current` ✅
+Mostra o auction ativo (tokenId, highBidder, highBid, endTime).
 
 ```bash
 builder auction current
 builder auction current --json
-
-# Output:
-# Token #1235 — Current Auction
-# Highest Bid: 0.042 ETH by vitalik.eth
-# Ends: 2h 15m remaining
-# Bids: 5
 ```
 
-#### `builder auction history`
-Lista auctions passados.
+#### `builder auction history` ✅
+Lista auctions passados (paginado com `--limit` / `--skip`).
 
 ```bash
 builder auction history --limit 10
 builder auction history --json
 ```
 
-#### `builder proposal list`
-Lista propostas.
+#### `builder proposal list` ✅
+Lista propostas com filtro de status e paginação.
 
 ```bash
 builder proposal list
-builder proposal list --status active
-builder proposal list --limit 20 --json
-
-# Output:
-# #  | Title                          | Status   | For  | Against | Quorum
-# 42 | Sponsor Skater X               | EXECUTED | 85   | 12      | 50
-# 41 | Community Event Fund           | ACTIVE   | 23   | 5       | 50
+builder proposal list --status ACTIVE
+builder proposal list --limit 20 --skip 0 --json
 ```
 
-#### `builder proposal get <id>`
-Detalhes de uma proposta.
+Status: `PENDING` `ACTIVE` `SUCCEEDED` `QUEUED` `DEFEATED` `EXECUTED` `CANCELED` `VETOED`
+
+#### `builder proposal get <id>` ✅
+Detalhes completos de uma proposta (por número ou `0x` proposalId).
 
 ```bash
 builder proposal get 42
-builder proposal get 0x1234...   # por proposalId hex
-
-# Output completo com description, votes, calldatas, etc.
+builder proposal get 0x1234...
 ```
 
-#### `builder proposal votes <id>`
-Votos de uma proposta.
+#### `builder proposal votes <id>` ✅
+Votos de uma proposta (ordenados por peso, paginado).
 
 ```bash
 builder proposal votes 42
-builder proposal votes 42 --support for
-builder proposal votes 42 --json
+builder proposal votes 42 --limit 50 --json
 ```
 
-#### `builder member list`
-Lista membros da DAO.
+> 🔜 **Futuro:** `--support for|against|abstain` para filtrar por tipo de voto
+
+#### `builder member list` ✅
+Lista membros da DAO, ordenados por tokenCount.
 
 ```bash
 builder member list
-builder member list --sort votes
-builder member list --active       # apenas membros ativos (votaram recentemente)
+builder member list --sort votes --limit 20
 ```
 
-#### `builder member info <address>`
-Detalhes de um membro.
+> 🔜 **Futuro:** `--active` para filtrar membros que votaram recentemente
+
+#### `builder member info <address>` ✅
+Detalhe de um membro: tokens, votes, delegation. Suporta ENS.
 
 ```bash
 builder member info 0x1234...
-builder member info vitalik.eth    # resolve ENS
-builder member info @username      # resolve via Farcaster
-
-# Output:
-# Member: vitalik.eth (0x1234...)
-# Farcaster: @vitalik (1234 followers)
-# Tokens: 3 (#12, #45, #67)
-# Delegating to: self
-# Proposals created: 5
-# Votes cast: 42 (89% attendance)
+builder member info vitalik.eth
 ```
 
-#### `builder treasury balance`
-Mostra o saldo do treasury.
+> 🔜 **Futuro:** `builder member info @username` via Farcaster handle
+
+#### `builder treasury balance` ✅
+Mostra saldo ETH do treasury.
 
 ```bash
 builder treasury balance
-
-# Output:
-# Treasury: 0x72ad986ebac0246d2b3c565ab2a1ce3a14ce6f88
-# ETH:  12.345
-# USDC: 50,000.00
-# WETH: 2.5
+builder treasury balance --json
 ```
 
-#### `builder token info <id>`
-Informações de um token específico.
+> 🔜 **Futuro:** ERC-20 balances (USDC, WETH, etc.)
+
+#### `builder token info <id>` ✅
+Owner e tokenURI de um token específico.
 
 ```bash
 builder token info 42
-
-# Output:
-# Token #42
-# Owner: vitalik.eth
-# Image: https://ipfs.io/ipfs/Qm...
-# Auction: Sold for 0.05 ETH on 2024-01-15
 ```
 
-### 6.2 Core — Write Operations
+### 6.2 Write Operations (requer `PRIVATE_KEY`)
 
-#### `builder vote <proposalId> <support>`
-Vota em uma proposta.
+#### `builder vote <proposalId> <support>` ✅
+Vota em uma proposta. Suporte: `for` / `against` / `abstain` (ou `0` / `1` / `2`).
 
 ```bash
 builder vote 42 for
 builder vote 42 against --reason "Budget too high"
-builder vote 42 abstain
-
-# Requer PRIVATE_KEY no .env ou --private-key flag
+builder vote 42 abstain --json
 ```
 
-#### `builder propose`
-Cria uma proposta.
+#### `builder propose` ✅
+Cria uma proposta. Suporta inline ou via arquivo JSON.
 
 ```bash
 builder propose \
@@ -315,57 +287,64 @@ builder propose \
 builder propose --from proposal.json
 ```
 
-#### `builder auction bid <amount>`
-Dá um bid no auction atual.
-
-```bash
-builder auction bid 0.05    # bid de 0.05 ETH
+**Formato do arquivo:**
+```json
+{
+  "title": "Fund Community Event",
+  "description": "Requesting 1 ETH...",
+  "targets": ["0x..."],
+  "values": ["1000000000000000000"],
+  "calldatas": ["0x"]
+}
 ```
 
-#### `builder delegate <address>`
-Delega tokens para outro endereço.
+#### `builder proposal queue <id>` ✅
+Move uma proposta SUCCEEDED para QUEUED (timelock).
+
+```bash
+builder proposal queue 42
+builder proposal queue 42 --json
+```
+
+#### `builder proposal execute <id>` ✅
+Executa uma proposta QUEUED (após timelock expirar).
+
+```bash
+builder proposal execute 42
+builder proposal execute 42 --json
+```
+
+#### `builder auction bid <amount>` ✅
+Dá um bid no auction ativo. Amount em ETH.
+
+```bash
+builder auction bid 0.05
+builder auction bid 0.05 --json
+```
+
+#### `builder auction settle` ✅
+Encerra o auction (após end time) e inicia um novo.
+
+```bash
+builder auction settle
+builder auction settle --json
+```
+
+#### `builder delegate <address>` ✅
+Delega poder de voto. Suporta ENS.
 
 ```bash
 builder delegate 0x1234...
 builder delegate vitalik.eth
 ```
 
-### 6.3 Discovery & Utilities
+### 6.3 Config
 
-#### `builder discover <token-or-ens>`
-Descobre e mostra todos os contratos de uma DAO.
+#### `builder config init` ✅
+Cria `.env.example` com todas as variáveis documentadas.
 
-```bash
-builder discover 0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17 --chain base
-builder discover gnars.eth --chain base
-
-# Output:
-# DAO Contracts discovered via Manager:
-# token:    0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17
-# auction:  0x494eaa55ecf6310658b8fc004b0888dcb698097f
-# governor: 0x3dd4e53a232b7b715c9ae455f4e732465ed71b4c
-# treasury: 0x72ad986ebac0246d2b3c565ab2a1ce3a14ce6f88
-# metadata: 0xdc9799d424ebfdcf5310f3bad3ddcce3931d4b58
-```
-
-#### `builder config init`
-Inicializa configuração local.
-
-```bash
-builder config init
-# Cria .env.example e .builder-cli.toml
-```
-
-#### `builder config show`
-Mostra configuração ativa.
-
-```bash
-builder config show
-# Token: 0x880f... (from .env)
-# Chain: base (from .env)
-# RPC: https://mainnet.base.org
-# Wallet: 0xABCD... (loaded)
-```
+#### `builder config show` ✅
+Mostra configuração ativa (token, chain, RPC, status da wallet).
 
 ---
 
@@ -374,9 +353,9 @@ builder config show
 | Flag | Short | Description |
 |------|-------|-------------|
 | `--token <address>` | `-t` | Token address da DAO |
-| `--chain <name>` | `-c` | Chain name: ethereum, base, optimism, zora |
+| `--chain <name>` | `-c` | Chain: ethereum, base, optimism, zora |
 | `--json` | `-j` | Output em JSON (para agentes) |
-| `--quiet` | `-q` | Output mínimo (apenas dados essenciais) |
+| `--quiet` | `-q` | Output mínimo |
 | `--rpc <url>` | | Custom RPC URL |
 | `--private-key <key>` | | Private key para write ops (prefer .env) |
 | `--help` | `-h` | Help |
@@ -386,61 +365,48 @@ builder config show
 
 ## 8. Integrações
 
-### 8.1 ENS
+### 8.1 ENS ✅
 
-- **Resolver nomes:** Converter ENS → address e address → ENS em toda a CLI
-- **Onde:** Member addresses, proposer, voters, delegate targets
-- **Como:** `viem`'s built-in `getEnsName()` / `getEnsAddress()` com mainnet client
-- **Cache:** In-memory LRU cache (TTL 15min) para evitar queries repetidas
+- Resolve nomes em inputs (address → ENS, ENS → address) e outputs
+- Cache in-memory LRU (TTL 15min, 500 entradas)
+- Resolução via mainnet client (viem built-in)
 
-### 8.2 Etherscan V2 (Unified Multi-chain)
+### 8.2 Etherscan V2 ✅
 
-- **API unificada:** Uma API key funciona em 50+ chains
-- **Base URL:** `https://api.etherscan.io/v2/api?chainid={CHAIN_ID}`
-- **Contract info:** Verificar se contratos estão verificados
-- **ABI fetch:** Fallback para buscar ABIs de contratos verificados (`module=contract&action=getabi`)
-- **Transaction links:** Incluir links do explorer nos outputs
-- **Rate limit:** 5 calls/sec com API key válida
-- **Explorer URLs para links:**
-  - Ethereum: `etherscan.io`
-  - Base: `basescan.org`
-  - Optimism: `optimistic.etherscan.io`
-  - Zora: `explorer.zora.energy`
+- Links de explorer em todos os outputs de write operations
+- ABI fetch de contratos verificados (fallback)
+- API unificada: uma key funciona em 50+ chains
+- Chain-aware: etherscan.io / basescan.org / optimistic.etherscan.io / explorer.zora.energy
 
-### 8.3 Farcaster (via Neynar)
+### 8.3 IPFS ✅
 
-- **Profile enrichment:** Mostrar username, display name, PFP de membros
-- **Resolve por handle:** `builder member info @username` → busca address via Neynar
-- **Batch lookup:** Para `member list`, batch-resolve addresses → FC profiles
-- **Opcional:** Só ativa se `NEYNAR_API_KEY` estiver configurada
+- Resolve `ipfs://` URIs para gateway URLs
+- Gateways com fallback: ipfs.io → dweb.link → w3s.link
 
-### 8.4 IPFS
+### 8.4 Farcaster (via Neynar) 🔜
 
-- **Token images:** Resolver `ipfs://` URIs para gateway URLs
-- **Proposal metadata:** Fetch de descrições armazenadas em IPFS
-- **Gateways (fallback chain):**
-  1. `https://ipfs.io`
-  2. `https://dweb.link`
-  3. `https://gateway.pinata.cloud`
-  4. `https://w3s.link`
+- Profile enrichment: username, display name de membros
+- `member info @username` → resolve address via Neynar
+- Batch lookup para `member list`
+- Ativa apenas se `NEYNAR_API_KEY` estiver configurada
+- **Status:** não implementado
 
 ---
 
 ## 9. Stack Técnica
 
-| Componente | Tecnologia | Justificativa |
-|------------|------------|---------------|
+| Componente | Tecnologia | Decisão |
+|------------|------------|---------|
 | Runtime | Node.js (LTS) | Compatível com ecossistema |
-| Linguagem | TypeScript (strict) | Type safety, DX |
-| CLI Framework | `cac` | Leve, tree-shakeable, sem overhead |
-| Blockchain | `viem` | Já usado no ecossistema Builder, type-safe |
-| Subgraph | `graphql-request` | Leve, usado pela @buildeross/sdk |
+| Linguagem | TypeScript (strict) | Type safety |
+| CLI Framework | `cac` | Leve, sem overhead |
+| Blockchain | `viem` | Type-safe, usado no ecossistema Builder |
+| Subgraph | `graphql-request` | Leve, compatível com @buildeross/sdk |
 | Schemas | `zod` | Validação de inputs e config |
-| Output | Custom formatters | Table (humanos) + JSON (agentes) |
-| Config | `dotenv` + TOML parser | Standard para CLI tools |
-| Build | `tsup` | Fast, usado no monorepo Builder |
-| Test | `vitest` | Fast, TS-native, usado no gnars-website |
-| Lint | `eslint` + `prettier` | Standard |
+| Build | `tsup` | Fast, ESM output |
+| Test | `vitest` | TS-native |
+
+**Decisão tomada:** `cac` vs `citty` — ficou com `cac`. Funciona bem para o scope atual.
 
 ### Dependências
 
@@ -452,32 +418,31 @@ builder config show
     "graphql": "^16.11.0",
     "cac": "^6.7.0",
     "zod": "^3.23.0",
-    "dotenv": "^16.4.0"
+    "dotenv": "^16.4.0",
+    "@zoralabs/coins-sdk": "^0.4.3"
   },
   "devDependencies": {
     "typescript": "^5.8.0",
     "tsup": "^8.3.0",
-    "vitest": "^2.0.0",
+    "vitest": "^2.1.0",
     "tsx": "^4.0.0",
     "@types/node": "^22.0.0"
-  },
-  "optionalDependencies": {
-    "@neynar/nodejs-sdk": "^2.0.0"
   }
 }
 ```
 
-**UNKNOWN:**
-- `cac` vs `commander` vs `citty`: `cac` é mais leve e tree-shakeable, mas `citty` (do UnJS) é mais moderno. Decisão: começar com `cac` por ser provado no ecossistema (usado no mcp-subgraph). Avaliar `citty` se surgirem limitações.
+> 🔜 **Futuro:** `@neynar/nodejs-sdk` como optionalDependency quando Farcaster for implementado
 
 ---
 
 ## 10. Estrutura do Projeto
 
 ```
-builder-cli/
-├── CLAUDE.md                   # Instruções para LLMs
+builder-dao-cli/
+├── CLAUDE.md
 ├── README.md
+├── docs/
+│   └── PRD.md
 ├── package.json
 ├── tsconfig.json
 ├── tsup.config.ts
@@ -485,16 +450,16 @@ builder-cli/
 ├── .env.example
 ├── .gitignore
 ├── src/
-│   ├── index.ts                # Entry point / CLI registration
-│   ├── cli.ts                  # cac setup + global flags
+│   ├── index.ts                # Entry point + subcommand routing
+│   ├── cli.ts                  # cac singleton + global flags
 │   ├── config/
-│   │   ├── index.ts            # Config loader (env + toml + flags)
+│   │   ├── index.ts            # Config loader (env + flags)
 │   │   ├── chains.ts           # Chain definitions + Manager addresses
-│   │   └── schema.ts           # Zod schemas for config validation
+│   │   └── schema.ts           # Zod schemas
 │   ├── core/
 │   │   ├── resolver.ts         # DAO address resolution (Manager contract)
-│   │   ├── subgraph.ts         # Subgraph GraphQL client
-│   │   ├── client.ts           # Viem public + wallet client factory
+│   │   ├── subgraph.ts         # Goldsky GraphQL client
+│   │   ├── client.ts           # Viem public + wallet client factory (cached)
 │   │   └── abis/               # Contract ABIs
 │   │       ├── manager.ts
 │   │       ├── governor.ts
@@ -504,79 +469,54 @@ builder-cli/
 │   │       └── metadata.ts
 │   ├── commands/
 │   │   ├── dao.ts              # dao info, dao discover
-│   │   ├── auction.ts          # auction current, auction history, auction bid
-│   │   ├── proposal.ts         # proposal list, proposal get, proposal votes
+│   │   ├── auction.ts          # auction current, auction history
+│   │   ├── proposal.ts         # proposal list, get, votes
 │   │   ├── member.ts           # member list, member info
 │   │   ├── treasury.ts         # treasury balance
 │   │   ├── token.ts            # token info
-│   │   ├── vote.ts             # vote for/against/abstain
-│   │   ├── propose.ts          # propose (create proposal)
-│   │   ├── delegate.ts         # delegate tokens
+│   │   ├── write.ts            # vote, propose, bid, settle, queue, execute, delegate
 │   │   └── config.ts           # config init, config show
 │   ├── integrations/
-│   │   ├── ens.ts              # ENS resolve + reverse
-│   │   ├── etherscan.ts        # Etherscan API (contract info, tx links)
-│   │   ├── farcaster.ts        # Neynar API (profiles, resolve handles)
-│   │   └── ipfs.ts             # IPFS gateway resolution with fallback
+│   │   ├── ens.ts              # ENS resolve + reverse (cached)
+│   │   ├── etherscan.ts        # Explorer URLs, ABI fetch
+│   │   └── ipfs.ts             # IPFS gateway resolution
 │   ├── output/
-│   │   ├── formatter.ts        # Output router (json/table/minimal)
-│   │   ├── table.ts            # Human-readable table formatter
-│   │   └── json.ts             # JSON output for agents
+│   │   ├── formatter.ts        # Output mode detection (JSON, quiet)
+│   │   ├── table.ts            # Table + key-value formatter
+│   │   └── json.ts             # JSON output
 │   └── utils/
-│       ├── format.ts           # ETH formatting, address truncation
-│       ├── cache.ts            # In-memory LRU cache
-│       └── errors.ts           # Error types and handling
-├── tests/
-│   ├── setup.ts
-│   ├── core/
-│   │   ├── resolver.test.ts    # DAO resolution tests
-│   │   └── subgraph.test.ts    # Subgraph client tests
-│   ├── commands/
-│   │   ├── dao.test.ts
-│   │   ├── proposal.test.ts
-│   │   └── member.test.ts
-│   └── integrations/
-│       ├── ens.test.ts
-│       └── farcaster.test.ts
-└── bin/
-    └── builder.ts              # Executable entry (#!/usr/bin/env node)
+│       ├── format.ts           # ETH, addresses, timestamps
+│       ├── cache.ts            # LRU cache
+│       └── errors.ts           # Custom errors + handler
+└── tests/
+    ├── utils/
+    │   ├── format.test.ts
+    │   └── cache.test.ts
+    └── integrations/
+        ├── etherscan.test.ts
+        └── ipfs.test.ts
 ```
 
 ---
 
-## 11. ABIs Necessários
+## 11. ABIs
 
-Os ABIs estão disponíveis em `@buildeross/sdk/contract`:
+Copiados de `@buildeross/sdk` (evita peer deps de React/Wagmi).
 
-| Contrato | Source | Funções-chave |
-|----------|--------|---------------|
-| **Manager** | `managerAbi` | `getAddresses(token)` → [metadata, auction, treasury, governor] |
-| **Token** | `tokenAbi` | `getVotes(account)`, `getPastVotes(account, block)`, `delegates(account)`, `delegate(to)`, `totalSupply()`, `ownerOf(tokenId)`, `tokenURI(tokenId)` |
-| **Auction** | `auctionAbi` | `auction()` → current auction, `createBid(tokenId)`, `settleCurrentAndCreateNewAuction()` |
-| **Governor** | `governorAbi` | `propose(targets, values, calldatas, description)`, `castVote(proposalId, support)`, `castVoteWithReason(proposalId, support, reason)`, `state(proposalId)`, `proposalThreshold()`, `quorum()` |
-| **Treasury** | `treasuryAbi` | `balance()`, `execute(target, value, data, description)` |
-| **Metadata** | `metadataAbi` | `tokenURI(tokenId)`, property items |
-
-**Decisão:** Copiar ABIs necessários da `@buildeross/sdk` para o projeto ao invés de depender do pacote inteiro (que puxa wagmi, React, etc. como peer deps). Extrair apenas os ABIs TypeScript.
+| Contrato | Funções-chave |
+|----------|---------------|
+| **Manager** | `getAddresses(token)` → [metadata, auction, treasury, governor] |
+| **Token** | `getVotes`, `delegates`, `delegate`, `totalSupply`, `ownerOf`, `tokenURI` |
+| **Auction** | `auction()` → estado atual, `createBid(tokenId)`, `settleCurrentAndCreateNewAuction()` |
+| **Governor** | `propose`, `castVote`, `castVoteWithReason`, `queue`, `execute`, `state`, `proposalEta` |
+| **Treasury** | (balance via publicClient.getBalance) |
+| **Metadata** | `tokenURI(tokenId)` |
 
 ---
 
 ## 12. Subgraph Queries
 
-### Queries reutilizadas do gnars-website (adaptar para multi-DAO):
-
-| Query | Source | Adaptação |
-|-------|--------|-----------|
-| DAO stats | `services/dao.ts` | Parametrizar `dao` ID |
-| Proposals list | `services/proposals.ts` | Usar `@buildeross/sdk` ou query direta |
-| Proposal detail + votes | `services/proposals.ts` | Já suporta by ID/number |
-| Members list | `services/members.ts` | Parametrizar DAO |
-| Member overview + votes | `services/members.ts` | Parametrizar DAO |
-| Active members | `services/members.ts` | `fetchActiveMembers()` |
-| Auctions | `services/auctions.ts` | Parametrizar DAO |
-| Delegators | `services/members.ts` | `fetchDelegatorsWithCounts()` |
-
-### Subgraph URL pattern:
+**URL pattern:**
 ```
 https://api.goldsky.com/api/public/{projectId}/subgraphs/nouns-builder-{chain}-mainnet/latest/gn
 ```
@@ -586,6 +526,12 @@ https://api.goldsky.com/api/public/{projectId}/subgraphs/nouns-builder-{chain}-m
 - `base` → `nouns-builder-base-mainnet`
 - `optimism` → `nouns-builder-optimism-mainnet`
 - `zora` → `nouns-builder-zora-mainnet`
+
+**Queries utilizadas:**
+- Proposals list/detail (com targets, values, calldatas para execute)
+- Proposal votes
+- Token holders (members)
+- Auction history
 
 ---
 
@@ -600,47 +546,28 @@ $ builder proposal list
 ────┼────────────────────────────────┼──────────┼─────┼─────────┼───────
  42 │ Sponsor Skater X               │ EXECUTED │  85 │      12 │     50
  41 │ Community Event Fund           │ ACTIVE   │  23 │       5 │     50
- 40 │ Website Redesign               │ DEFEATED │  15 │      30 │     50
 ```
 
 ### JSON (--json)
 
 ```json
-{
-  "dao": {
-    "token": "0x880fb3cf5c6cc2d7dfc13a993e839a9411200c17",
-    "chain": "base",
-    "chainId": 8453
-  },
-  "proposals": [
-    {
-      "proposalNumber": 42,
-      "title": "Sponsor Skater X",
-      "status": "EXECUTED",
-      "forVotes": 85,
-      "againstVotes": 12,
-      "quorumVotes": 50,
-      "proposer": "0x1234...",
-      "proposerEns": "vitalik.eth",
-      "voteStart": "2024-01-01T00:00:00Z",
-      "voteEnd": "2024-01-08T00:00:00Z"
-    }
-  ],
-  "pagination": {
-    "total": 42,
-    "limit": 20,
-    "offset": 0,
-    "hasMore": true
+[
+  {
+    "proposalId": "0x...",
+    "proposalNumber": 42,
+    "title": "Sponsor Skater X",
+    "status": "EXECUTED",
+    "forVotes": "85",
+    "againstVotes": "12",
+    "quorumVotes": "50",
+    "proposer": "0x1234...",
+    "voteStart": "1704067200",
+    "voteEnd": "1704672000"
   }
-}
+]
 ```
 
-### Minimal (--quiet)
-
-```
-42 EXECUTED "Sponsor Skater X"
-41 ACTIVE "Community Event Fund"
-```
+> 🔜 **Futuro:** `pagination` wrapper `{ items, total, limit, offset, hasMore }` no JSON output
 
 ---
 
@@ -648,166 +575,111 @@ $ builder proposal list
 
 | Cenário | Handling |
 |---------|----------|
-| Token address inválido | Mensagem clara + hint para `builder discover` |
-| DAO não encontrada no Manager | "No DAO found at this address on {chain}" |
-| RPC timeout | Retry 1x, depois erro com sugestão de custom RPC |
-| Subgraph indisponível | Fallback para leitura on-chain quando possível |
-| Wallet não configurada (write ops) | "Set PRIVATE_KEY in .env or use --private-key" |
-| Insufficient funds / gas | Mensagem clara com balances |
-| Neynar API key ausente | Silently skip Farcaster enrichment |
-| ENS resolution fail | Usar address sem nome, sem erro |
+| Token inválido | Mensagem clara + hint |
+| DAO não encontrada | "No DAO found at this address on {chain}" |
+| RPC timeout | Erro com sugestão de custom RPC |
+| Wallet não configurada | "Set PRIVATE_KEY in .env or use --private-key" |
+| Bid abaixo do atual | "Bid must exceed current highest bid of X ETH" |
+| Auction já encerrado | "Auction has ended" |
+| Auction já settled | "Auction is already settled" |
+| ENS resolution fail | Usa address sem nome, sem erro |
+| Neynar ausente | 🔜 Silently skip Farcaster enrichment |
+
+Erros em modo `--json`:
+```json
+{ "error": "Proposal not found", "hint": "Check proposal ID" }
+```
 
 ---
 
 ## 15. Security
 
-- **NUNCA** logar/exibir private keys
-- Private key via `.env` (com `.gitignore`) ou `--private-key` (efêmero)
-- Confirmar write operations antes de submeter tx (prompt y/n, skip com `--yes`)
-- Validar todos os inputs com Zod antes de enviar on-chain
-- Rate limiting para APIs externas (Etherscan: 5/s, Neynar: conforme plano)
+- **NUNCA** logar private keys
+- Private key via `.env` (gitignored) ou `--private-key` (flag efêmera)
+- Inputs validados com Zod antes de enviar on-chain
+- `PRIVATE_KEY` pattern validado: `0x` + 64 hex chars
+
+> 🔜 **Futuro:** confirmation prompt antes de write ops (`--yes` para skip em automações)
 
 ---
 
-## 16. MVP (Fase 1)
+## 16. Status das Fases
 
-### Escopo
+### Fase 1 — Read operations ✅ Concluído
 
-**Read operations (sem wallet):**
-1. `builder dao info` — resolve + mostra contratos
-2. `builder discover` — auto-discovery via Manager
-3. `builder proposal list` — lista propostas
-4. `builder proposal get` — detalhe de proposta
-5. `builder proposal votes` — votos de proposta
-6. `builder auction current` — auction ativo
-7. `builder member list` — lista membros
-8. `builder member info` — detalhe de membro
-9. `builder treasury balance` — saldo do treasury
-10. `builder config init` + `builder config show`
+- `dao info`, `dao discover`
+- `proposal list`, `proposal get`, `proposal votes`
+- `auction current`, `auction history`
+- `member list`, `member info`
+- `treasury balance`
+- `token info`
+- `config init`, `config show`
+- ENS + Etherscan links + IPFS + JSON output
 
-**Integrações MVP:**
-- ENS resolve (nomes em outputs)
-- Etherscan links em outputs
-- Output JSON para agentes
+### Fase 2 — Write operations ✅ Concluído
 
-**Fora do MVP:**
-- Write operations (vote, propose, bid, delegate)
-- Farcaster integration
-- IPFS image resolution
-- MCP server mode
+- `vote`, `propose`
+- `auction bid`, `auction settle`
+- `proposal queue`, `proposal execute`
+- `delegate`
 
-### Métricas de Sucesso MVP
+### Fase 3 — Enrichment & MCP 🔜 Planejado
 
-- [ ] `builder dao info` funciona com Gnars (Base), Purple (Ethereum), e pelo menos 1 DAO em cada chain suportada
-- [ ] `--json` output parseável por agente
-- [ ] Zero config: `builder discover 0x880f... --chain base` funciona sem .env
-- [ ] < 3s para qualquer read operation (p95)
-
----
-
-## 17. Fase 2: Write Operations
-
-**Escopo:**
-1. `builder vote <id> <for|against|abstain>`
-2. `builder auction bid <amount>`
-3. `builder delegate <address>`
-4. `builder propose --from file.json`
-
-**Requer:**
-- Wallet integration via private key
-- Transaction confirmation prompt
-- Gas estimation + display
-- Transaction tracking (hash + explorer link)
+1. Farcaster profile enrichment (Neynar)
+2. `member info @username` via Farcaster handle
+3. `--active` filter em `member list`
+4. ERC-20 balances no `treasury balance`
+5. Pagination wrapper no JSON output
+6. MCP Server mode
+7. `builder token traits` — download de trait images
+8. Proposal search (semântico)
+9. Gas estimation display em write ops
+10. Confirmation prompt antes de write ops (`--yes` para skip)
 
 ---
 
-## 18. Fase 3: Enrichment & MCP
+## 17. Métricas
 
-**Escopo:**
-1. Farcaster profile enrichment
-2. IPFS image resolution
-3. MCP Server mode (reutilizar padrão do mcp-subgraph)
-4. Proposal search (semantic, reutilizar padrão do mcp-subgraph)
-5. `builder token traits` — download trait images
-
----
-
-## 19. Implementação — Ordem
-
-### Sprint 1: Foundation (Dias 1-3)
-1. Setup projeto (package.json, tsconfig, tsup, vitest)
-2. Config module (env + chains + Zod validation)
-3. Core: Viem client factory
-4. Core: DAO resolver (Manager contract)
-5. Core: Subgraph client (GraphQL)
-6. ABIs: Manager, Token, Governor, Auction, Treasury, Metadata
-7. Tests: resolver, subgraph client
-
-### Sprint 2: Read Commands (Dias 4-7)
-1. CLI setup com `cac` + global flags
-2. Output formatter (table + json + minimal)
-3. `builder dao info` + `builder discover`
-4. `builder proposal list` + `builder proposal get` + `builder proposal votes`
-5. `builder auction current` + `builder auction history`
-6. `builder member list` + `builder member info`
-7. `builder treasury balance`
-8. Tests para cada command
-
-### Sprint 3: Integrations + Polish (Dias 8-10)
-1. ENS integration
-2. Etherscan links
-3. `builder config init` + `builder config show`
-4. Error handling + edge cases
-5. README.md + CLAUDE.md
-6. NPM publish prep
+- `dao info` funciona com Gnars (Base), Purple (Ethereum), e pelo menos 1 DAO em cada chain
+- `--json` output parseável por agente sem pós-processamento
+- Zero config: `builder dao discover 0x880f... --chain base` funciona sem `.env`
+- < 3s para qualquer read operation (p95)
+- Write ops: tx confirmada em < 30s (exceto latência de rede)
 
 ---
 
-## 20. Publicação
+## 18. Publicação
+
+> 🔜 Não publicado no NPM ainda.
 
 ```bash
-# Nome do pacote
+# Nome do pacote (a confirmar disponibilidade)
 builder-dao-cli
 
 # Binário
 builder
 
-# NPM
+# NPM (futuro)
 npx builder-dao-cli dao info --token 0x... --chain base
 
-# Global install
+# Global install (futuro)
 pnpm add -g builder-dao-cli
-builder dao info
 ```
 
----
-
-## 21. UNKNOWN / Decisões Pendentes
-
-- `TOML_CONFIG:` usar `.builder-cli.toml` ou só `.env`? → Começar com `.env` only, TOML se houver demanda
-- `PACKAGE_NAME:` `builder-dao-cli` ou `builder-cli`? → Verificar disponibilidade no NPM
-- `MCP_FIRST:` Priorizar MCP server mode no MVP? → Não, mas arquitetar para ser fácil adicionar (separar lógica dos commands)
-- `MONO_OR_STANDALONE:` Monorepo com SDK separada ou pacote único? → Pacote único no MVP, split se crescer
-- `EXISTING_SDK:` Usar `@buildeross/sdk` diretamente ou copiar o necessário? → Copiar ABIs + queries, evitar peer deps de React/Wagmi
+**Decisão pendente:** `builder-dao-cli` vs `builder-cli` — verificar disponibilidade no NPM antes de publicar.
 
 ---
 
-## 22. Referências
+## 19. Referências
 
 | Recurso | Path/URL |
 |---------|----------|
-| Gnars CLI scripts (referência) | `/Users/r4to/Script/gnars-website/scripts/` |
-| Gnars services (padrões) | `/Users/r4to/Script/gnars-website/src/services/` |
-| Gnars config (addresses) | `/Users/r4to/Script/gnars-website/src/lib/config.ts` |
-| Gnars MCP subgraph (padrão) | `/Users/r4to/Script/gnars-website/mcp-subgraph/` |
-| Builder SDK (ABIs + subgraph) | `/Users/r4to/Script/gnars-website/references/nouns-builder/packages/sdk/` |
-| Builder Constants (addresses) | `/Users/r4to/Script/gnars-website/references/nouns-builder/packages/constants/` |
-| Builder monorepo | `https://github.com/BuilderOSS/nouns-builder` |
-| Builder subgraphs (Goldsky) | `https://api.goldsky.com/api/public/project_cm33ek8kjx6pz010i2c3w8z25/subgraphs/` |
-| nouns.build (frontend) | `https://nouns.build` |
-| Builder docs | `https://docs.nouns.build` |
+| ABIs source | `/Users/r4to/Script/gnars-website/references/nouns-builder/packages/sdk/src/contract/abis/` |
+| Service patterns | `/Users/r4to/Script/gnars-website/src/services/` |
+| Builder SDK | `https://github.com/BuilderOSS/nouns-builder` |
+| Goldsky Subgraphs | `https://api.goldsky.com/api/public/project_cm33ek8kjx6pz010i2c3w8z25/subgraphs/` |
+| nouns.build | `https://nouns.build` |
 | Nouns Protocol contracts | `https://github.com/ourzora/nouns-protocol` |
-| Nouns Protocol addresses | `https://github.com/ourzora/nouns-protocol/tree/main/addresses` |
-| Etherscan V2 API | `https://api.etherscan.io/v2/api` (unified multi-chain) |
+| Etherscan V2 API | `https://api.etherscan.io/v2/api` |
 | Neynar API (Farcaster) | `https://docs.neynar.com/` |
 | ProtocolRewards (all chains) | `0x7777777F279eba3d3Ad8F4E708545291A6fDBA8B` |
